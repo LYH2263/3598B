@@ -151,6 +151,7 @@ class BalanceChangeLog(models.Model):
     TYPE_FREEZE = 'freeze'
     TYPE_UNFREEZE = 'unfreeze'
     TYPE_ADJUST = 'adjust'
+    TYPE_REFUND = 'refund'
 
     CHANGE_TYPE_CHOICES = [
         (TYPE_RECHARGE, '充值入账'),
@@ -158,6 +159,7 @@ class BalanceChangeLog(models.Model):
         (TYPE_FREEZE, '账户冻结'),
         (TYPE_UNFREEZE, '账户解冻'),
         (TYPE_ADJUST, '余额调整'),
+        (TYPE_REFUND, '退费扣减'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='balance_logs')

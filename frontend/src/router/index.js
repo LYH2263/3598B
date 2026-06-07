@@ -68,6 +68,36 @@ const router = createRouter({
       component: () => import('../views/CustomReportBuilder.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/my-refunds',
+      name: 'my-refunds',
+      component: () => import('../views/MyRefundsView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/my-invoices',
+      name: 'my-invoices',
+      component: () => import('../views/MyInvoicesView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/invoice-titles',
+      name: 'invoice-titles',
+      component: () => import('../views/InvoiceTitlesView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/refund-approval',
+      name: 'refund-approval',
+      component: () => import('../views/RefundApprovalView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/invoice-processing',
+      name: 'invoice-processing',
+      component: () => import('../views/InvoiceProcessingView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

@@ -11,4 +11,5 @@ urlpatterns = [
     path('api/notices/', include('notices.urls')),
     path('api/dormitory/', include('dormitory.urls')),
     path('api/activities/', include('activities.urls')),
+    path('api/refund-invoice/', include('refund_invoice.urls')),
 ]

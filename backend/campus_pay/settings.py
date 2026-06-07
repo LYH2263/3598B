@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'notices',
     'dormitory',
     'activities',
+    'refund_invoice',
 ]
 
 MIDDLEWARE = [
@@ -98,7 +99,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
-        'LOCATION': '/tmp/label-3598-cache',
+        'LOCATION': str(BASE_DIR / 'cache_data'),
     }
 }
 
@@ -178,6 +179,11 @@ LOGGING = {
             'propagate': False,
         },
         'activities': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'refund_invoice': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
