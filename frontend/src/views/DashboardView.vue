@@ -70,6 +70,24 @@ const myRoom = reactive({
   history: [],
 })
 
+const myActivities = ref([])
+const calendarActivities = ref([])
+
+const activityStatusMap = {
+  draft: { label: '草稿', type: 'info' },
+  published: { label: '报名中', type: 'success' },
+  ongoing: { label: '进行中', type: 'primary' },
+  ended: { label: '已结束', type: 'warning' },
+}
+
+const activityRegistrationStatusMap = {
+  pending: { label: '待审核', type: 'warning' },
+  approved: { label: '已报名', type: 'success' },
+  rejected: { label: '已驳回', type: 'danger' },
+  checked_in: { label: '已签到(实际参与)', type: 'primary' },
+  cancelled: { label: '已取消', type: 'info' },
+}
+
 const buildings = ref([])
 const buildingForm = reactive({
   name: '',
@@ -566,11 +584,35 @@ async function walletAction(row, action) {
   await Promise.all([loadAdminUsers(), loadWalletLogs()])
 }
 
+async function loadMyActivities() {
+  if (isAdmin.value) return
+  try {
+    const { data } = await http.get('/activities/registrations/my/')
+    myActivities.value = data || []
+  } catch (_e) {
+    myActivities.value = []
+  }
+}
+
+async function loadCalendarActivities() {
+  if (isAdmin.value) return
+  try {
+    const { data } = await http.get('/activities/calendar/')
+    calendarActivities.value = data || []
+  } catch (_e) {
+    calendarActivities.value = []
+  }
+}
+
 async function refreshAll() {
   loading.value = true
   try {
     const tasks = [loadDashboard(), loadOrders(), loadConsumptions(), loadConsumptionStats(), loadWalletLogs(), loadAnnouncements(), loadNotifications(), loadMyRoom()]
-    if (isAdmin.value) tasks.push(loadAdminUsers(), loadBuildings(), loadRooms())
+    if (isAdmin.value) {
+      tasks.push(loadAdminUsers(), loadBuildings(), loadRooms())
+    } else {
+      tasks.push(loadMyActivities(), loadCalendarActivities())
+    }
     await Promise.all(tasks)
   } finally {
     loading.value = false
@@ -610,6 +652,8 @@ onMounted(async () => {
             </p>
           </el-col>
           <el-col :xs="24" :sm="6" style="text-align: right">
+            <el-button style="margin-right: 8px" @click="router.push('/activities')">校园活动</el-button>
+            <el-button v-if="isAdmin" style="margin-right: 8px" type="primary" plain @click="router.push('/activities/manage')">活动管理</el-button>
             <el-button style="margin-right: 8px" @click="refreshAll">刷新数据</el-button>
             <el-button type="danger" plain @click="logout">退出登录</el-button>
           </el-col>
@@ -927,6 +971,91 @@ onMounted(async () => {
                 </div>
               </el-tab-pane>
 
+              <el-tab-pane v-if="!isAdmin" label="我的活动" name="my-activities">
+                <el-row :gutter="12" style="margin-bottom: 12px">
+                  <el-col :span="16">
+                    <h3 class="section-title" style="margin: 0">我报名的活动</h3>
+                  </el-col>
+                  <el-col :span="8" style="text-align: right">
+                    <el-button type="primary" plain @click="router.push('/activities')">浏览更多活动</el-button>
+                  </el-col>
+                </el-row>
+                <el-table :data="myActivities" stripe border empty-text="暂无报名记录">
+                  <el-table-column label="活动" min-width="200">
+                    <template #default="{ row }">
+                      <div style="cursor: pointer; color: var(--el-color-primary)" @click="router.push(`/activities/${row.activity}`)">
+                        {{ row.activity_title }}
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="地点" min-width="140">
+                    <template #default="{ row }">{{ row.activity_location }}</template>
+                  </el-table-column>
+                  <el-table-column label="时间" min-width="320">
+                    <template #default="{ row }">
+                      {{ formatDateTime(row.activity_start_time) }} ~ {{ formatDateTime(row.activity_end_time) }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="状态" min-width="120">
+                    <template #default="{ row }">
+                      <el-tag :type="activityRegistrationStatusMap[row.status]?.type || 'info'" effect="plain">
+                        {{ activityRegistrationStatusMap[row.status]?.label || row.status }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="已支付" min-width="100">
+                    <template #default="{ row }">¥ {{ formatMoney(row.paid_amount) }}</template>
+                  </el-table-column>
+                  <el-table-column label="签到时间" min-width="165">
+                    <template #default="{ row }">{{ formatDateTime(row.check_in_time) }}</template>
+                  </el-table-column>
+                  <el-table-column label="报名时间" min-width="165">
+                    <template #default="{ row }">{{ formatDateTime(row.registered_at) }}</template>
+                  </el-table-column>
+                </el-table>
+              </el-tab-pane>
+
+              <el-tab-pane v-if="!isAdmin" label="活动日历" name="activity-calendar">
+                <el-row :gutter="12" style="margin-bottom: 12px">
+                  <el-col :span="16">
+                    <h3 class="section-title" style="margin: 0">近期活动日历</h3>
+                  </el-col>
+                  <el-col :span="8" style="text-align: right">
+                    <el-button @click="loadCalendarActivities">刷新日历</el-button>
+                  </el-col>
+                </el-row>
+                <el-table :data="calendarActivities" stripe border empty-text="暂无活动">
+                  <el-table-column label="日期" min-width="220">
+                    <template #default="{ row }">
+                      <el-icon><Calendar /></el-icon>
+                      <span style="margin-left: 6px">{{ formatDateTime(row.start_time) }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="活动" min-width="220">
+                    <template #default="{ row }">
+                      <div style="cursor: pointer; color: var(--el-color-primary)" @click="router.push(`/activities/${row.id}`)">
+                        {{ row.title }}
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="地点" min-width="160">
+                    <template #default="{ row }">{{ row.location }}</template>
+                  </el-table-column>
+                  <el-table-column label="状态" min-width="100">
+                    <template #default="{ row }">
+                      <el-tag :type="activityStatusMap[row.status]?.type || 'info'" effect="plain">
+                        {{ activityStatusMap[row.status]?.label || row.status }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="报名情况" min-width="130">
+                    <template #default="{ row }">
+                      {{ row.registered_count || 0 }} / {{ row.max_participants }} 人
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </el-tab-pane>
+
               <el-tab-pane v-if="isAdmin" label="房间台账" name="dormitory">
                 <div style="margin-bottom: 14px">
                   <h3 class="section-title">楼栋管理</h3>
@@ -1189,3 +1318,10 @@ onMounted(async () => {
     </section>
   </main>
 </template>
+
+<script>
+import { Calendar } from '@element-plus/icons-vue'
+export default {
+  components: { Calendar },
+}
+</script>

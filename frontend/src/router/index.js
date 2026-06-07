@@ -32,6 +32,24 @@ const router = createRouter({
       component: () => import('../views/DashboardView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/activities',
+      name: 'activities',
+      component: () => import('../views/ActivitiesView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/activities/manage',
+      name: 'activity-manage',
+      component: () => import('../views/ActivityManageView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/activities/:id',
+      name: 'activity-detail',
+      component: () => import('../views/ActivityDetailView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
