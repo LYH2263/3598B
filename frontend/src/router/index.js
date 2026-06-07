@@ -98,6 +98,18 @@ const router = createRouter({
       component: () => import('../views/InvoiceProcessingView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/config-center',
+      name: 'config-center',
+      component: () => import('../views/ConfigCenterView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/campus-manage',
+      name: 'campus-manage',
+      component: () => import('../views/CampusManageView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

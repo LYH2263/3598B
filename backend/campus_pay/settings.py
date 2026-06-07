@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'dormitory',
     'activities',
     'refund_invoice',
+    'config_center',
 ]
 
 MIDDLEWARE = [

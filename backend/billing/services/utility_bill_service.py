@@ -10,6 +10,7 @@ from billing.models import BalanceChangeLog, MeterReading, UtilityBill, Wallet
 from billing.services.ledger_service import LedgerService
 from billing.services.price_service import PriceService
 from billing.services.meter_service import MeterService
+from config_center.services.config_service import ConfigService
 from notices.services import NotificationService
 
 
@@ -17,6 +18,30 @@ class UtilityBillService:
     LATE_FEE_RATE = Decimal('0.0005')
     LATE_FEE_GRACE_DAYS = 0
     DEFAULT_DUE_DAYS = 15
+
+    @staticmethod
+    def _get_late_fee_rate(user=None) -> Decimal:
+        val = ConfigService.get_for_user('pricing', 'late_fee_daily_rate', user)
+        if val is not None:
+            try:
+                return Decimal(str(val))
+            except Exception:
+                pass
+        return UtilityBillService.LATE_FEE_RATE
+
+    @staticmethod
+    def _get_grace_days(user=None) -> int:
+        val = ConfigService.get_for_user('pricing', 'late_fee_grace_days', user)
+        if isinstance(val, int) and val >= 0:
+            return val
+        return UtilityBillService.LATE_FEE_GRACE_DAYS
+
+    @staticmethod
+    def _get_due_days(user=None) -> int:
+        val = ConfigService.get_for_user('pricing', 'bill_default_due_days', user)
+        if isinstance(val, int) and val > 0:
+            return val
+        return UtilityBillService.DEFAULT_DUE_DAYS
 
     @staticmethod
     def _money(value: Decimal) -> Decimal:
@@ -41,7 +66,7 @@ class UtilityBillService:
             usage=reading.usage,
         )
 
-        due_date = reading.period_end + timedelta(days=UtilityBillService.DEFAULT_DUE_DAYS)
+        due_date = reading.period_end + timedelta(days=UtilityBillService._get_due_days(user))
 
         bill = UtilityBill.objects.create(
             bill_no=UtilityBillService._next_bill_no(),
@@ -211,15 +236,17 @@ class UtilityBillService:
             return bill.late_fee_amount
 
         today = timezone.now().date()
-        if today <= bill.due_date + timedelta(days=UtilityBillService.LATE_FEE_GRACE_DAYS):
+        grace_days = UtilityBillService._get_grace_days(bill.user)
+        if today <= bill.due_date + timedelta(days=grace_days):
             return bill.late_fee_amount
 
-        overdue_days = (today - bill.due_date - timedelta(days=UtilityBillService.LATE_FEE_GRACE_DAYS)).days
+        overdue_days = (today - bill.due_date - timedelta(days=grace_days)).days
         if overdue_days <= 0:
             return bill.late_fee_amount
 
+        late_fee_rate = UtilityBillService._get_late_fee_rate(bill.user)
         new_late_fee = UtilityBillService._money(
-            bill.base_amount * UtilityBillService.LATE_FEE_RATE * overdue_days
+            bill.base_amount * late_fee_rate * overdue_days
         )
 
         if apply and new_late_fee != bill.late_fee_amount:

@@ -1,10 +1,16 @@
 import random
 from django.core.cache import cache
 
+from config_center.services.config_service import ConfigService
+
 
 class PasswordResetService:
-    CODE_TTL_SECONDS = 300
     CACHE_KEY_PREFIX = 'pwd_reset_email_code:'
+
+    @classmethod
+    def _get_ttl_seconds(cls) -> int:
+        val = ConfigService.get_int('security', 'email_code_ttl_seconds', default=300)
+        return val if val > 0 else 300
 
     @classmethod
     def _cache_key(cls, user_id: int) -> str:
@@ -13,7 +19,7 @@ class PasswordResetService:
     @classmethod
     def issue_email_code(cls, user) -> str:
         code = f'{random.randint(100000, 999999)}'
-        cache.set(cls._cache_key(user.id), code, timeout=cls.CODE_TTL_SECONDS)
+        cache.set(cls._cache_key(user.id), code, timeout=cls._get_ttl_seconds())
         return code
 
     @classmethod

@@ -99,7 +99,7 @@ class RequestResetEmailCodeAPIView(APIView):
                 'detail': f'验证码已发送到邮箱 {masked_email}（演示环境可直接使用返回验证码）。',
                 'masked_email': masked_email,
                 'demo_email_code': code,
-                'expires_in': PasswordResetService.CODE_TTL_SECONDS,
+                'expires_in': PasswordResetService._get_ttl_seconds(),
             }
         )
 
@@ -130,6 +130,7 @@ class AdminUserListAPIView(APIView):
         keyword = request.query_params.get('keyword', '').strip()
         role = request.query_params.get('role', '').strip()
         is_active = request.query_params.get('is_active', '').strip()
+        campus_id = request.query_params.get('campus_id', '').strip()
 
         queryset = User.objects.select_related('profile', 'wallet').all().order_by('-date_joined')
 
@@ -144,6 +145,14 @@ class AdminUserListAPIView(APIView):
             queryset = queryset.filter(profile__role=role)
         if is_active in {'true', 'false'}:
             queryset = queryset.filter(is_active=(is_active == 'true'))
+        if campus_id:
+            if campus_id == '0':
+                queryset = queryset.filter(profile__campus__isnull=True)
+            else:
+                try:
+                    queryset = queryset.filter(profile__campus_id=int(campus_id))
+                except ValueError:
+                    pass
 
         return Response(AdminUserSerializer(queryset[:200], many=True).data)
 

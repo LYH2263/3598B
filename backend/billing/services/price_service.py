@@ -2,6 +2,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from typing import Tuple
 
 from billing.models import ConsumptionRecord, PriceStrategy
+from config_center.services.config_service import ConfigService
 
 
 class PriceService:
@@ -21,12 +22,18 @@ class PriceService:
         return PriceStrategy.objects.filter(category=category, is_active=True).first()
 
     @staticmethod
-    def get_unit_price(category: str) -> Decimal:
+    def get_unit_price(category: str, user=None) -> Decimal:
         strategy = PriceService.get_active_strategy(category)
         if strategy:
             return PriceService._price4(strategy.unit_price)
         if category == ConsumptionRecord.CATEGORY_WATER:
+            cfg_val = ConfigService.get_for_user('pricing', 'default_water_price', user)
+            if cfg_val is not None:
+                return PriceService._price4(Decimal(str(cfg_val)))
             return PriceService._price4(PriceService.DEFAULT_WATER_PRICE)
+        cfg_val = ConfigService.get_for_user('pricing', 'default_electricity_price', user)
+        if cfg_val is not None:
+            return PriceService._price4(Decimal(str(cfg_val)))
         return PriceService._price4(PriceService.DEFAULT_ELECTRICITY_PRICE)
 
     @staticmethod

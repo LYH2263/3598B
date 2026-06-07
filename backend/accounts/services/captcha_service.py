@@ -3,11 +3,17 @@ import uuid
 
 from django.core.cache import cache
 
+from config_center.services.config_service import ConfigService
+
 CAPTCHA_KEY_PREFIX = 'captcha_challenge:'
-CAPTCHA_EXPIRE_SECONDS = 300
 
 
 class CaptchaService:
+    @staticmethod
+    def _get_expire_seconds() -> int:
+        val = ConfigService.get_int('security', 'captcha_expire_seconds', default=300)
+        return val if val > 0 else 300
+
     @staticmethod
     def generate_challenge() -> dict:
         left = random.randint(1, 20)
@@ -17,13 +23,14 @@ class CaptchaService:
             left, right = right, left
         answer = left + right if operator == '+' else left - right
 
+        expire_seconds = CaptchaService._get_expire_seconds()
         captcha_id = uuid.uuid4().hex
-        cache.set(f'{CAPTCHA_KEY_PREFIX}{captcha_id}', str(answer), timeout=CAPTCHA_EXPIRE_SECONDS)
+        cache.set(f'{CAPTCHA_KEY_PREFIX}{captcha_id}', str(answer), timeout=expire_seconds)
 
         return {
             'captcha_id': captcha_id,
             'question': f'{left} {operator} {right} = ?',
-            'expires_in': CAPTCHA_EXPIRE_SECONDS,
+            'expires_in': expire_seconds,
         }
 
     @staticmethod

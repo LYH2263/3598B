@@ -18,6 +18,14 @@ class Profile(models.Model):
     phone = models.CharField(max_length=20, unique=True, null=True, blank=True)
     security_question = models.CharField(max_length=255, blank=True, default='')
     security_answer_hash = models.CharField(max_length=255, blank=True, default='')
+    campus = models.ForeignKey(
+        'config_center.Campus',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='profiles',
+        verbose_name='所属校区',
+    )
 
     class Meta:
         db_table = 'profiles'

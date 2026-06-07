@@ -57,7 +57,9 @@ const adminUserFilters = reactive({
   keyword: '',
   role: '',
   is_active: '',
+  campus_id: '',
 })
+const campuses = ref([])
 
 const announcementForm = reactive({
   title: '',
@@ -538,13 +540,29 @@ async function markAllNotificationsRead() {
   await loadNotifications()
 }
 
+async function loadCampuses() {
+  try {
+    const { data } = await http.get('/config/campuses/simple/')
+    campuses.value = data
+  } catch (_e) {
+    campuses.value = []
+  }
+}
+
 async function loadAdminUsers() {
   const params = {}
   if (adminUserFilters.keyword) params.keyword = adminUserFilters.keyword
   if (adminUserFilters.role) params.role = adminUserFilters.role
   if (adminUserFilters.is_active) params.is_active = adminUserFilters.is_active
+  if (adminUserFilters.campus_id) params.campus_id = adminUserFilters.campus_id
   const { data } = await http.get('/auth/admin/users/', { params })
   adminUsers.value = data
+}
+
+async function updateUserCampus(row, campusId) {
+  await http.patch(`/auth/admin/users/${row.id}/`, { campus_id: campusId || null })
+  ElNotification({ title: '已更新', message: '用户校区已更新。', type: 'success' })
+  await loadAdminUsers()
 }
 
 async function updateUserRole(row, role) {
@@ -609,7 +627,7 @@ async function refreshAll() {
   try {
     const tasks = [loadDashboard(), loadOrders(), loadConsumptions(), loadConsumptionStats(), loadWalletLogs(), loadAnnouncements(), loadNotifications(), loadMyRoom()]
     if (isAdmin.value) {
-      tasks.push(loadAdminUsers(), loadBuildings(), loadRooms())
+      tasks.push(loadAdminUsers(), loadBuildings(), loadRooms(), loadCampuses())
     } else {
       tasks.push(loadMyActivities(), loadCalendarActivities())
     }
@@ -654,6 +672,8 @@ onMounted(async () => {
           <el-col :xs="24" :sm="6" style="text-align: right">
             <el-button v-if="isAdmin" style="margin-right: 8px" type="primary" @click="router.push('/analytics')">📊 数据看板</el-button>
             <el-button v-if="isAdmin" style="margin-right: 8px" @click="router.push('/reports')">📋 自定义报表</el-button>
+            <el-button v-if="isAdmin" style="margin-right: 8px" @click="router.push('/config-center')">⚙️ 配置中心</el-button>
+            <el-button v-if="isAdmin" style="margin-right: 8px" @click="router.push('/campus-manage')">🏫 校区管理</el-button>
             <el-button style="margin-right: 8px" @click="router.push('/activities')">校园活动</el-button>
             <el-button v-if="isAdmin" style="margin-right: 8px" type="primary" plain @click="router.push('/activities/manage')">活动管理</el-button>
             <el-button style="margin-right: 8px" @click="refreshAll">刷新数据</el-button>
@@ -819,30 +839,51 @@ onMounted(async () => {
 
               <el-tab-pane v-if="isAdmin" label="用户管理" name="users">
                 <el-row :gutter="12" style="margin-bottom: 12px">
-                  <el-col :span="8">
+                  <el-col :span="6">
                     <el-input v-model="adminUserFilters.keyword" placeholder="搜索用户名/学号/手机号" clearable />
                   </el-col>
-                  <el-col :span="6">
-                    <el-select v-model="adminUserFilters.role" style="width: 100%" placeholder="角色筛选">
+                  <el-col :span="5">
+                    <el-select v-model="adminUserFilters.role" style="width: 100%" placeholder="角色筛选" clearable>
                       <el-option label="全部角色" value="" />
                       <el-option label="学生" value="student" />
                       <el-option label="管理员" value="admin" />
                     </el-select>
                   </el-col>
-                  <el-col :span="6">
-                    <el-select v-model="adminUserFilters.is_active" style="width: 100%" placeholder="状态筛选">
+                  <el-col :span="5">
+                    <el-select v-model="adminUserFilters.is_active" style="width: 100%" placeholder="状态筛选" clearable>
                       <el-option label="全部状态" value="" />
                       <el-option label="启用" value="true" />
                       <el-option label="禁用" value="false" />
                     </el-select>
                   </el-col>
-                  <el-col :span="4"><el-button @click="loadAdminUsers">查询用户</el-button></el-col>
+                  <el-col :span="5">
+                    <el-select v-model="adminUserFilters.campus_id" style="width: 100%" placeholder="按校区筛选" clearable>
+                      <el-option label="全部校区" value="" />
+                      <el-option label="未分配校区" value="0" />
+                      <el-option v-for="c in campuses" :key="c.id" :label="`${c.name} (${c.code})`" :value="String(c.id)" />
+                    </el-select>
+                  </el-col>
+                  <el-col :span="3"><el-button @click="loadAdminUsers">查询</el-button></el-col>
                 </el-row>
 
                 <el-table :data="adminUsers" stripe border empty-text="暂无用户数据">
                   <el-table-column prop="id" label="ID" width="70" />
                   <el-table-column prop="username" label="用户名" min-width="120" />
                   <el-table-column prop="email" label="邮箱" min-width="180" />
+                  <el-table-column label="校区" min-width="160">
+                    <template #default="{ row }">
+                      <el-select
+                        :model-value="row.campus ? String(row.campus) : ''"
+                        size="small"
+                        placeholder="选择校区"
+                        clearable
+                        @change="(val) => updateUserCampus(row, val ? Number(val) : null)"
+                      >
+                        <el-option label="（未分配）" value="" />
+                        <el-option v-for="c in campuses" :key="c.id" :label="`${c.name} (${c.code})`" :value="String(c.id)" />
+                      </el-select>
+                    </template>
+                  </el-table-column>
                   <el-table-column label="角色" min-width="140">
                     <template #default="{ row }">
                       <el-select :model-value="row.profile.role" size="small" @change="(val) => updateUserRole(row, val)">

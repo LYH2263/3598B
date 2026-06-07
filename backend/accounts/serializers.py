@@ -10,9 +10,11 @@ from billing.models import Wallet
 
 
 class ProfileSerializer(serializers.ModelSerializer):
+    campus_name = serializers.CharField(source='campus.name', default='', read_only=True)
+
     class Meta:
         model = Profile
-        fields = ('role', 'student_id', 'phone', 'security_question')
+        fields = ('role', 'student_id', 'phone', 'security_question', 'campus', 'campus_name')
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -192,6 +194,8 @@ class AdminUserSerializer(serializers.ModelSerializer):
     profile = ProfileSerializer(read_only=True)
     balance = serializers.SerializerMethodField()
     wallet_frozen = serializers.SerializerMethodField()
+    campus = serializers.SerializerMethodField()
+    campus_name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -204,7 +208,17 @@ class AdminUserSerializer(serializers.ModelSerializer):
             'profile',
             'balance',
             'wallet_frozen',
+            'campus',
+            'campus_name',
         )
+
+    def get_campus(self, obj):
+        profile = getattr(obj, 'profile', None)
+        return profile.campus_id if profile else None
+
+    def get_campus_name(self, obj):
+        profile = getattr(obj, 'profile', None)
+        return profile.campus.name if profile and profile.campus else ''
 
     def get_balance(self, obj):
         wallet = getattr(obj, 'wallet', None)
@@ -218,6 +232,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
 class AdminUserUpdateSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=Profile.ROLE_CHOICES, required=False)
     is_active = serializers.BooleanField(required=False)
+    campus_id = serializers.IntegerField(allow_null=True, required=False)
 
     def validate(self, attrs):
         if not attrs:
@@ -227,12 +242,25 @@ class AdminUserUpdateSerializer(serializers.Serializer):
     def update(self, instance, validated_data):
         role = validated_data.get('role')
         is_active = validated_data.get('is_active')
+        campus_id = validated_data.get('campus_id', None)
 
-        if role:
-            profile = getattr(instance, 'profile', None)
-            if profile:
+        profile = getattr(instance, 'profile', None)
+        if profile:
+            updated_fields = []
+            if role:
                 profile.role = role
-                profile.save(update_fields=['role'])
+                updated_fields.append('role')
+            if 'campus_id' in validated_data:
+                from config_center.models import Campus
+                if campus_id is None:
+                    profile.campus = None
+                else:
+                    campus = Campus.objects.filter(id=campus_id).first()
+                    if campus:
+                        profile.campus = campus
+                updated_fields.append('campus')
+            if updated_fields:
+                profile.save(update_fields=updated_fields)
 
         if is_active is not None:
             instance.is_active = is_active
