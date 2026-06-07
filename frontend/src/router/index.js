@@ -122,6 +122,12 @@ const router = createRouter({
       component: () => import('../views/CollectionManageView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/data-center',
+      name: 'data-center',
+      component: () => import('../views/DataCenterView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
