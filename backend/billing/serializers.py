@@ -7,10 +7,12 @@ from accounts.models import Profile
 from billing.models import (
     BalanceChangeLog,
     ConsumptionRecord,
+    DashboardPreference,
     MeterReading,
     PriceStrategy,
     RechargeOrder,
     RechargeRecord,
+    SavedReport,
     UtilityBill,
     Wallet,
 )
@@ -392,3 +394,51 @@ class BillBatchGenerateSerializer(serializers.Serializer):
             operator=request.user.username,
         )
         return bills
+
+
+class SavedReportSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SavedReport
+        fields = (
+            'id',
+            'name',
+            'description',
+            'dataset',
+            'dimensions',
+            'measures',
+            'filters',
+            'chart_type',
+            'chart_config',
+            'is_pinned',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = ('id', 'user', 'created_at', 'updated_at')
+
+
+class DatasetQuerySerializer(serializers.Serializer):
+    dataset = serializers.ChoiceField(
+        choices=[
+            ('recharge', '充值流水'),
+            ('consumption', '消费流水'),
+            ('user_growth', '用户增长'),
+        ]
+    )
+    dimensions = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+    )
+    measures = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+    )
+    filters = serializers.DictField(required=False, default=dict)
+
+
+class DashboardPreferenceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DashboardPreference
+        fields = ('layout', 'updated_at')
+        read_only_fields = ('updated_at',)

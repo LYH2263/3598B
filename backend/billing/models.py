@@ -6,6 +6,35 @@ from django.db.models import Q
 from dormitory.models import Room
 
 
+class SavedReport(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='saved_reports')
+    name = models.CharField(max_length=255)
+    description = models.CharField(max_length=500, blank=True, default='')
+    dataset = models.CharField(max_length=50)
+    dimensions = models.JSONField(default=list)
+    measures = models.JSONField(default=list)
+    filters = models.JSONField(default=dict)
+    chart_type = models.CharField(max_length=30, default='bar')
+    chart_config = models.JSONField(default=dict, blank=True)
+    is_pinned = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'saved_reports'
+        ordering = ['-updated_at']
+
+
+class DashboardPreference(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='dashboard_pref')
+    layout = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'dashboard_preferences'
+
+
 class Wallet(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='wallet')
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)

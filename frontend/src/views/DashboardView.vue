@@ -652,6 +652,8 @@ onMounted(async () => {
             </p>
           </el-col>
           <el-col :xs="24" :sm="6" style="text-align: right">
+            <el-button v-if="isAdmin" style="margin-right: 8px" type="primary" @click="router.push('/analytics')">📊 数据看板</el-button>
+            <el-button v-if="isAdmin" style="margin-right: 8px" @click="router.push('/reports')">📋 自定义报表</el-button>
             <el-button style="margin-right: 8px" @click="router.push('/activities')">校园活动</el-button>
             <el-button v-if="isAdmin" style="margin-right: 8px" type="primary" plain @click="router.push('/activities/manage')">活动管理</el-button>
             <el-button style="margin-right: 8px" @click="refreshAll">刷新数据</el-button>

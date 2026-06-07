@@ -50,6 +50,24 @@ const router = createRouter({
       component: () => import('../views/ActivityDetailView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/analytics',
+      name: 'analytics',
+      component: () => import('../views/AdminAnalyticsView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/reports',
+      name: 'reports',
+      component: () => import('../views/SavedReportsView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/reports/build',
+      name: 'report-builder',
+      component: () => import('../views/CustomReportBuilder.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
