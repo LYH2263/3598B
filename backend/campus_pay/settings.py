@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'activities',
     'refund_invoice',
     'config_center',
+    'reminder',
 ]
 
 MIDDLEWARE = [
@@ -185,6 +186,11 @@ LOGGING = {
             'propagate': False,
         },
         'refund_invoice': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'reminder': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,

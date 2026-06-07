@@ -110,6 +110,18 @@ const router = createRouter({
       component: () => import('../views/CampusManageView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/reminders',
+      name: 'reminder-center',
+      component: () => import('../views/ReminderCenterView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/collection-manage',
+      name: 'collection-manage',
+      component: () => import('../views/CollectionManageView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
