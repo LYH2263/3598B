@@ -1,0 +1,55 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: label-3598-db
+    environment:
+      POSTGRES_DB: czxt
+      POSTGRES_USER: czxt
+      POSTGRES_PASSWORD: Czxt@3598
+    ports:
+      - "5598:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U czxt -d czxt"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: label-3598-backend
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-label-3598-super-secret-key-change-in-production-2026}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-czxt}
+      DB_USER: ${DB_USER:-czxt}
+      DB_PASSWORD: ${DB_PASSWORD:-Czxt@3598}
+      DB_SCHEMA: ${DB_SCHEMA:-czxt}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      DB_CONN_MAX_AGE: ${DB_CONN_MAX_AGE:-300}
+      DB_CONNECT_TIMEOUT: ${DB_CONNECT_TIMEOUT:-10}
+      APP_FRONTEND_URL: ${APP_FRONTEND_URL:-http://localhost:3598}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8598:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: label-3598-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3598:80"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

@@ -1,0 +1,23 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+build/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.venv/
+.vscode/
+.idea/
+staticfiles/
+
+# 对话过程与题目文件
+对话/
+题目.md
+代码生成.md
+迭代.md
