@@ -16,4 +16,5 @@ urlpatterns = [
     path('api/reminder/', include('reminder.urls')),
     path('api/data-center/', include('data_center.urls')),
     path('api/search/', include('search.urls')),
+    path('api/audit/', include('audit_center.urls')),
 ]

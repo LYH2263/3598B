@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'reminder',
     'data_center',
     'search',
+    'audit_center',
 ]
 
 MIDDLEWARE = [
@@ -198,6 +199,11 @@ LOGGING = {
             'propagate': False,
         },
         'data_center': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'audit_center': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,

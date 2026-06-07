@@ -128,6 +128,12 @@ const router = createRouter({
       component: () => import('../views/DataCenterView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/audit-center',
+      name: 'audit-center',
+      component: () => import('../views/AuditCenterView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

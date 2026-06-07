@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.permissions import IsAdminRole
+from audit_center.services.audit_service import AuditService
 from config_center.models import Campus, ConfigChangeLog
 from config_center.serializers import (
     CampusSerializer,
@@ -125,6 +126,13 @@ class ConfigUpdateAPIView(APIView):
             if not campus:
                 return Response({'detail': '校区不存在。'}, status=status.HTTP_400_BAD_REQUEST)
 
+        old_value = ''
+        try:
+            from config_center.services.config_service import ConfigService
+            old_value = ConfigService.get_effective_raw_value(group, key, campus)
+        except Exception:
+            pass
+
         value_obj, err = ConfigService.set_value(
             group=group,
             key=key,
@@ -135,6 +143,9 @@ class ConfigUpdateAPIView(APIView):
         )
         if err:
             return Response({'detail': err}, status=status.HTTP_400_BAD_REQUEST)
+
+        new_value = serializer.validated_data['value']
+        AuditService.log_config_change(request, key, old_value, new_value, group)
 
         return Response({'detail': '配置已更新。'})
 

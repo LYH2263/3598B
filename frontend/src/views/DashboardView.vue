@@ -787,6 +787,7 @@ onMounted(async () => {
               <el-button v-if="isAdmin" @click="router.push('/config-center')">⚙️ 配置中心</el-button>
               <el-button v-if="isAdmin" @click="router.push('/campus-manage')">🏫 校区管理</el-button>
               <el-button v-if="isAdmin" type="warning" @click="router.push('/collection-manage')">⏰ 催缴管理</el-button>
+              <el-button v-if="isAdmin" type="success" @click="router.push('/audit-center')">🔍 审计中台</el-button>
               <el-button type="primary" plain @click="router.push('/reminders')">🔔 提醒中心</el-button>
               <el-button @click="router.push('/activities')">校园活动</el-button>
               <el-button v-if="isAdmin" type="primary" plain @click="router.push('/activities/manage')">活动管理</el-button>

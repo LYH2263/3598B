@@ -9,6 +9,8 @@ from rest_framework.views import APIView
 
 from accounts.models import Profile
 from accounts.permissions import IsAdminRole
+from audit_center.models import AuditLog
+from audit_center.services.audit_service import AuditService, audit_log
 from billing.models import (
     BalanceChangeLog,
     ConsumptionRecord,
@@ -127,6 +129,7 @@ class RechargeOrderListCreateAPIView(APIView):
         serializer = RechargeOrderCreateSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         order = serializer.save()
+        AuditService.log_order_submit(request, order)
         return Response(RechargeOrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
 
@@ -146,6 +149,12 @@ class RechargeOrderReviewAPIView(APIView):
             action=serializer.validated_data['action'],
             reviewer=request.user,
             review_remark=serializer.validated_data.get('review_remark', ''),
+        )
+        AuditService.log_order_review(
+            request,
+            order,
+            serializer.validated_data['action'],
+            serializer.validated_data.get('review_remark', ''),
         )
         return Response(RechargeOrderSerializer(reviewed_order).data)
 
@@ -248,8 +257,10 @@ class WalletActionAPIView(APIView):
 
         if action == 'freeze':
             wallet = LedgerService.freeze_wallet(target_user, request.user.username, reason)
+            AuditService.log_wallet_freeze(request, target_user, reason)
         else:
             wallet = LedgerService.unfreeze_wallet(target_user, request.user.username, reason)
+            AuditService.log_wallet_unfreeze(request, target_user, reason)
 
         return Response({'wallet': WalletSerializer(wallet).data})
 

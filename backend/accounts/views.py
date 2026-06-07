@@ -20,6 +20,8 @@ from accounts.serializers import (
 )
 from accounts.services.captcha_service import CaptchaService
 from accounts.services.reset_service import PasswordResetService
+from audit_center.models import AuditLog
+from audit_center.services.audit_service import AuditService, audit_log
 from notices.services import NotificationService
 
 logger = logging.getLogger(__name__)
@@ -35,6 +37,7 @@ class CaptchaAPIView(APIView):
 class RegisterAPIView(APIView):
     permission_classes = [permissions.AllowAny]
 
+    @audit_log(category=AuditLog.CATEGORY_USER, action=AuditLog.ACTION_CREATE, remark='用户注册')
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -48,7 +51,10 @@ class LoginAPIView(APIView):
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            username = request.data.get('username', '')
+            AuditService.log_login_failed(request, username)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         user = serializer.validated_data['user']
         remember_me = serializer.validated_data.get('remember_me', False)
@@ -57,6 +63,7 @@ class LoginAPIView(APIView):
         if not remember_me:
             refresh.set_exp(lifetime=timedelta(hours=12))
 
+        AuditService.log_login_success(request, user)
         logger.info('User logged in: %s', user.username)
         return Response(
             {
@@ -112,6 +119,8 @@ class PasswordResetAPIView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
+        AuditService.log_password_reset(request, user)
+
         NotificationService.create_user_notification(
             user=user,
             title='密码变更提醒',
@@ -165,9 +174,28 @@ class AdminUserDetailAPIView(APIView):
         if not user:
             return Response({'detail': '用户不存在。'}, status=status.HTTP_404_NOT_FOUND)
 
+        before_data = {
+            'is_active': user.is_active,
+            'role': getattr(user.profile, 'role', ''),
+            'email': user.email,
+        }
+
+        old_role = getattr(user.profile, 'role', '')
+
         serializer = AdminUserUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.update(user, serializer.validated_data)
+
+        new_role = getattr(user.profile, 'role', '')
+        if old_role != new_role:
+            AuditService.log_role_change(request, user, old_role, new_role)
+
+        after_data = {
+            'is_active': user.is_active,
+            'role': new_role,
+            'email': user.email,
+        }
+        AuditService.log_user_update(request, user, before_data, after_data)
 
         NotificationService.create_user_notification(
             user=user,
