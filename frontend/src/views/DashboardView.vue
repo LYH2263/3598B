@@ -65,6 +65,64 @@ const announcementForm = reactive({
   is_active: true,
 })
 
+const myRoom = reactive({
+  room: null,
+  history: [],
+})
+
+const buildings = ref([])
+const buildingForm = reactive({
+  name: '',
+  description: '',
+})
+const buildingDialogVisible = ref(false)
+const editingBuildingId = ref(null)
+
+const rooms = ref([])
+const roomFilters = reactive({
+  building_id: '',
+  keyword: '',
+  only_active: '',
+})
+const roomForm = reactive({
+  building: null,
+  room_number: '',
+  capacity: 4,
+  is_active: true,
+  description: '',
+})
+const roomDialogVisible = ref(false)
+const editingRoomId = ref(null)
+
+const selectedRoom = ref(null)
+const roomDetailDialogVisible = ref(false)
+const roomResidents = ref([])
+const roomHistory = ref([])
+
+const bindDialogVisible = ref(false)
+const bindForm = reactive({
+  user_id: null,
+  room_id: null,
+  remark: '',
+})
+const availableStudents = ref([])
+const studentKeyword = ref('')
+const studentOnlyUnassigned = ref(true)
+
+const unbindDialogVisible = ref(false)
+const unbindForm = reactive({
+  user_id: null,
+  remark: '',
+})
+
+const changeRoomDialogVisible = ref(false)
+const changeRoomForm = reactive({
+  user_id: null,
+  new_room_id: null,
+  remark: '',
+})
+const changeRoomTargetUser = ref(null)
+
 const isAdmin = computed(() => authStore.user?.profile?.role === 'admin')
 
 const channelMap = {
@@ -121,6 +179,229 @@ function consumeStatsForTrend() {
 async function loadDashboard() {
   const { data } = await http.get('/billing/dashboard/')
   Object.assign(dashboard, data)
+}
+
+async function loadMyRoom() {
+  const { data } = await http.get('/dormitory/my-room/')
+  Object.assign(myRoom, data)
+}
+
+async function loadBuildings() {
+  const { data } = await http.get('/dormitory/buildings/')
+  buildings.value = data
+}
+
+async function openBuildingCreate() {
+  editingBuildingId.value = null
+  buildingForm.name = ''
+  buildingForm.description = ''
+  buildingDialogVisible.value = true
+}
+
+async function openBuildingEdit(building) {
+  editingBuildingId.value = building.id
+  buildingForm.name = building.name
+  buildingForm.description = building.description || ''
+  buildingDialogVisible.value = true
+}
+
+async function saveBuilding() {
+  if (!buildingForm.name.trim()) {
+    ElNotification({ title: '保存失败', message: '请输入楼栋名称。', type: 'warning' })
+    return
+  }
+  actionLoading.value = true
+  try {
+    if (editingBuildingId.value) {
+      await http.put(`/dormitory/buildings/${editingBuildingId.value}/`, buildingForm)
+      ElNotification({ title: '修改成功', message: '楼栋信息已更新。', type: 'success' })
+    } else {
+      await http.post('/dormitory/buildings/', buildingForm)
+      ElNotification({ title: '创建成功', message: '楼栋已添加。', type: 'success' })
+    }
+    buildingDialogVisible.value = false
+    await Promise.all([loadBuildings(), loadRooms()])
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function deleteBuilding(building) {
+  try {
+    await ElMessageBox.confirm(`确定删除楼栋「${building.name}」吗？`, '删除确认', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch (_e) {
+    return
+  }
+  try {
+    await http.delete(`/dormitory/buildings/${building.id}/`)
+    ElNotification({ title: '删除成功', message: '楼栋已删除。', type: 'success' })
+    await Promise.all([loadBuildings(), loadRooms()])
+  } catch (_e) {}
+}
+
+async function loadRooms() {
+  const params = {}
+  if (roomFilters.building_id) params.building_id = roomFilters.building_id
+  if (roomFilters.keyword) params.keyword = roomFilters.keyword
+  if (roomFilters.only_active) params.only_active = roomFilters.only_active
+  const { data } = await http.get('/dormitory/rooms/', { params })
+  rooms.value = data
+}
+
+async function openRoomCreate() {
+  editingRoomId.value = null
+  roomForm.building = buildings.value[0]?.id || null
+  roomForm.room_number = ''
+  roomForm.capacity = 4
+  roomForm.is_active = true
+  roomForm.description = ''
+  roomDialogVisible.value = true
+}
+
+async function openRoomEdit(room) {
+  editingRoomId.value = room.id
+  roomForm.building = room.building
+  roomForm.room_number = room.room_number
+  roomForm.capacity = room.capacity
+  roomForm.is_active = room.is_active
+  roomForm.description = room.description || ''
+  roomDialogVisible.value = true
+}
+
+async function saveRoom() {
+  if (!roomForm.building) {
+    ElNotification({ title: '保存失败', message: '请选择所属楼栋。', type: 'warning' })
+    return
+  }
+  if (!roomForm.room_number.trim()) {
+    ElNotification({ title: '保存失败', message: '请输入房间号。', type: 'warning' })
+    return
+  }
+  if (!roomForm.capacity || Number(roomForm.capacity) <= 0) {
+    ElNotification({ title: '保存失败', message: '房间容量必须大于 0。', type: 'warning' })
+    return
+  }
+  actionLoading.value = true
+  try {
+    const payload = { ...roomForm }
+    if (editingRoomId.value) {
+      await http.put(`/dormitory/rooms/${editingRoomId.value}/`, payload)
+      ElNotification({ title: '修改成功', message: '房间信息已更新。', type: 'success' })
+    } else {
+      await http.post('/dormitory/rooms/', payload)
+      ElNotification({ title: '创建成功', message: '房间已添加。', type: 'success' })
+    }
+    roomDialogVisible.value = false
+    await loadRooms()
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function deleteRoom(room) {
+  try {
+    await ElMessageBox.confirm(`确定删除房间「${room.building_name} ${room.room_number}」吗？`, '删除确认', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch (_e) {
+    return
+  }
+  try {
+    await http.delete(`/dormitory/rooms/${room.id}/`)
+    ElNotification({ title: '删除成功', message: '房间已删除。', type: 'success' })
+    await loadRooms()
+  } catch (_e) {}
+}
+
+async function openRoomDetail(room) {
+  selectedRoom.value = room
+  const { data } = await http.get(`/dormitory/rooms/${room.id}/`)
+  roomResidents.value = data.residents
+  roomHistory.value = data.history
+  roomDetailDialogVisible.value = true
+}
+
+async function loadAvailableStudents() {
+  const params = {}
+  if (studentKeyword.value) params.keyword = studentKeyword.value
+  if (studentOnlyUnassigned.value) params.only_unassigned = 'true'
+  const { data } = await http.get('/dormitory/students/available/', { params })
+  availableStudents.value = data
+}
+
+async function openBindDialog(room) {
+  bindForm.user_id = null
+  bindForm.room_id = room.id
+  bindForm.remark = ''
+  studentKeyword.value = ''
+  studentOnlyUnassigned.value = true
+  availableStudents.value = []
+  await loadAvailableStudents()
+  bindDialogVisible.value = true
+}
+
+async function submitBind() {
+  if (!bindForm.user_id) {
+    ElNotification({ title: '绑定失败', message: '请选择要绑定的学生。', type: 'warning' })
+    return
+  }
+  actionLoading.value = true
+  try {
+    await http.post('/dormitory/assignments/bind/', bindForm)
+    ElNotification({ title: '绑定成功', message: '学生已绑定到房间。', type: 'success' })
+    bindDialogVisible.value = false
+    await Promise.all([loadRooms(), selectedRoom.value && openRoomDetail(selectedRoom.value)])
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function openUnbindDialog(resident) {
+  unbindForm.user_id = resident.user
+  unbindForm.remark = ''
+  unbindDialogVisible.value = true
+}
+
+async function submitUnbind() {
+  actionLoading.value = true
+  try {
+    await http.post('/dormitory/assignments/unbind/', unbindForm)
+    ElNotification({ title: '解绑成功', message: '学生已从房间解绑。', type: 'success' })
+    unbindDialogVisible.value = false
+    await Promise.all([loadRooms(), selectedRoom.value && openRoomDetail(selectedRoom.value)])
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function openChangeRoomDialog(resident) {
+  changeRoomTargetUser.value = resident
+  changeRoomForm.user_id = resident.user
+  changeRoomForm.new_room_id = null
+  changeRoomForm.remark = ''
+  changeRoomDialogVisible.value = true
+}
+
+async function submitChangeRoom() {
+  if (!changeRoomForm.new_room_id) {
+    ElNotification({ title: '换房失败', message: '请选择目标房间。', type: 'warning' })
+    return
+  }
+  actionLoading.value = true
+  try {
+    await http.post('/dormitory/assignments/change-room/', changeRoomForm)
+    ElNotification({ title: '换房成功', message: '学生已换至新房间。', type: 'success' })
+    changeRoomDialogVisible.value = false
+    await Promise.all([loadRooms(), selectedRoom.value && openRoomDetail(selectedRoom.value)])
+  } finally {
+    actionLoading.value = false
+  }
 }
 
 async function loadOrders() {
@@ -288,8 +569,8 @@ async function walletAction(row, action) {
 async function refreshAll() {
   loading.value = true
   try {
-    const tasks = [loadDashboard(), loadOrders(), loadConsumptions(), loadConsumptionStats(), loadWalletLogs(), loadAnnouncements(), loadNotifications()]
-    if (isAdmin.value) tasks.push(loadAdminUsers())
+    const tasks = [loadDashboard(), loadOrders(), loadConsumptions(), loadConsumptionStats(), loadWalletLogs(), loadAnnouncements(), loadNotifications(), loadMyRoom()]
+    if (isAdmin.value) tasks.push(loadAdminUsers(), loadBuildings(), loadRooms())
     await Promise.all(tasks)
   } finally {
     loading.value = false
@@ -345,7 +626,7 @@ onMounted(async () => {
         </template>
 
         <template #default>
-          <section class="summary-grid">
+          <section class="summary-grid" :style="{ gridTemplateColumns: !isAdmin && myRoom.room ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)' }">
             <article class="summary-card">
               <div class="label">账户余额</div>
               <div class="value">¥ {{ formatMoney(dashboard.wallet.balance) }}</div>
@@ -361,11 +642,51 @@ onMounted(async () => {
               <div class="value">¥ {{ formatMoney(dashboard.summary.total_consumption) }}</div>
               <div class="summary-note">消息中心支持公告与订单提醒</div>
             </article>
+            <article v-if="!isAdmin" class="summary-card">
+              <div class="label">我的宿舍</div>
+              <div class="value" style="font-size: 20px">
+                {{ myRoom.room ? myRoom.room.building_name + ' ' + myRoom.room.room_number : '未分配' }}
+              </div>
+              <div class="summary-note">
+                {{ myRoom.room ? `入住 ${myRoom.room.current_occupancy}/${myRoom.room.capacity} 人` : '请联系管理员分配宿舍' }}
+              </div>
+            </article>
           </section>
 
           <el-card class="section-card" shadow="never">
             <el-tabs v-model="activeTab">
               <el-tab-pane v-if="!isAdmin" label="总览" name="overview">
+                <el-card v-if="myRoom.room" class="section-card" shadow="never" style="margin-bottom: 14px">
+                  <h3 class="section-title">我的宿舍信息</h3>
+                  <el-row :gutter="16">
+                    <el-col :span="8">
+                      <div style="color: var(--text-sub); font-size: 13px">楼栋</div>
+                      <div style="font-size: 18px; font-weight: 700; margin-top: 4px">{{ myRoom.room.building_name }}</div>
+                    </el-col>
+                    <el-col :span="8">
+                      <div style="color: var(--text-sub); font-size: 13px">房间号</div>
+                      <div style="font-size: 18px; font-weight: 700; margin-top: 4px">{{ myRoom.room.room_number }}</div>
+                    </el-col>
+                    <el-col :span="8">
+                      <div style="color: var(--text-sub); font-size: 13px">入住情况</div>
+                      <div style="font-size: 18px; font-weight: 700; margin-top: 4px">{{ myRoom.room.current_occupancy }} / {{ myRoom.room.capacity }} 人</div>
+                    </el-col>
+                  </el-row>
+                  <el-divider style="margin: 12px 0" />
+                  <div style="color: var(--text-sub); font-size: 13px; margin-bottom: 6px">入住历史</div>
+                  <el-table :data="myRoom.history" stripe border size="small" empty-text="暂无入住历史">
+                    <el-table-column label="楼栋" min-width="110">
+                      <template #default="{ row }">{{ row.building_name }}</template>
+                    </el-table-column>
+                    <el-table-column prop="room_number" label="房间号" min-width="90" />
+                    <el-table-column label="入住时间" min-width="165">
+                      <template #default="{ row }">{{ formatDateTime(row.bound_at) }}</template>
+                    </el-table-column>
+                    <el-table-column label="退房时间" min-width="165">
+                      <template #default="{ row }">{{ formatDateTime(row.unbound_at) }}</template>
+                    </el-table-column>
+                  </el-table>
+                </el-card>
                 <div class="form-grid">
                   <el-card class="section-card" shadow="never">
                     <h3 class="section-title">快速提交充值订单</h3>
@@ -605,8 +926,264 @@ onMounted(async () => {
                   </el-card>
                 </div>
               </el-tab-pane>
+
+              <el-tab-pane v-if="isAdmin" label="房间台账" name="dormitory">
+                <div style="margin-bottom: 14px">
+                  <h3 class="section-title">楼栋管理</h3>
+                  <el-row :gutter="12" style="margin-bottom: 10px">
+                    <el-col :span="16">
+                      <el-button type="primary" @click="openBuildingCreate">新增楼栋</el-button>
+                    </el-col>
+                  </el-row>
+                  <el-table :data="buildings" stripe border empty-text="暂无楼栋数据">
+                    <el-table-column prop="id" label="ID" width="70" />
+                    <el-table-column prop="name" label="楼栋名称" min-width="140" />
+                    <el-table-column prop="description" label="备注" min-width="200" show-overflow-tooltip />
+                    <el-table-column prop="room_count" label="房间数" width="100" />
+                    <el-table-column label="创建时间" min-width="165">
+                      <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
+                    </el-table-column>
+                    <el-table-column label="操作" min-width="180" fixed="right">
+                      <template #default="{ row }">
+                        <el-space>
+                          <el-button size="small" @click="openBuildingEdit(row)">编辑</el-button>
+                          <el-button size="small" type="danger" plain @click="deleteBuilding(row)">删除</el-button>
+                        </el-space>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                </div>
+
+                <el-divider />
+
+                <div>
+                  <h3 class="section-title">房间管理</h3>
+                  <el-row :gutter="12" style="margin-bottom: 10px">
+                    <el-col :span="6">
+                      <el-select v-model="roomFilters.building_id" style="width: 100%" placeholder="按楼栋筛选" clearable>
+                        <el-option v-for="b in buildings" :key="b.id" :label="b.name" :value="b.id" />
+                      </el-select>
+                    </el-col>
+                    <el-col :span="6">
+                      <el-input v-model="roomFilters.keyword" placeholder="搜索房间号/楼栋" clearable />
+                    </el-col>
+                    <el-col :span="6">
+                      <el-select v-model="roomFilters.only_active" style="width: 100%" placeholder="状态筛选" clearable>
+                        <el-option label="仅启用" value="true" />
+                        <el-option label="仅停用" value="false" />
+                      </el-select>
+                    </el-col>
+                    <el-col :span="6" style="text-align: right">
+                      <el-button style="margin-right: 8px" @click="loadRooms">查询</el-button>
+                      <el-button type="primary" @click="openRoomCreate">新增房间</el-button>
+                    </el-col>
+                  </el-row>
+                  <el-table :data="rooms" stripe border empty-text="暂无房间数据">
+                    <el-table-column prop="id" label="ID" width="70" />
+                    <el-table-column prop="building_name" label="楼栋" min-width="110" />
+                    <el-table-column prop="room_number" label="房间号" min-width="100" />
+                    <el-table-column label="入住情况" min-width="120">
+                      <template #default="{ row }">
+                        <el-tag :type="row.is_full ? 'danger' : 'success'" effect="plain">
+                          {{ row.current_occupancy }} / {{ row.capacity }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="状态" min-width="90">
+                      <template #default="{ row }">
+                        <el-tag :type="row.is_active ? 'success' : 'info'" effect="plain">
+                          {{ row.is_active ? '启用' : '停用' }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="description" label="备注" min-width="160" show-overflow-tooltip />
+                    <el-table-column label="操作" min-width="300" fixed="right">
+                      <template #default="{ row }">
+                        <el-space wrap>
+                          <el-button size="small" type="primary" plain @click="openRoomDetail(row)">查看住户</el-button>
+                          <el-button size="small" type="success" plain :disabled="row.is_full || !row.is_active" @click="openBindDialog(row)">绑定住户</el-button>
+                          <el-button size="small" @click="openRoomEdit(row)">编辑</el-button>
+                          <el-button size="small" type="danger" plain @click="deleteRoom(row)">删除</el-button>
+                        </el-space>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                </div>
+              </el-tab-pane>
             </el-tabs>
           </el-card>
+
+          <el-dialog v-model="buildingDialogVisible" :title="editingBuildingId ? '编辑楼栋' : '新增楼栋'" width="480px">
+            <el-form label-position="top" @submit.prevent>
+              <el-form-item label="楼栋名称">
+                <el-input v-model="buildingForm.name" placeholder="例如：1号楼、2号宿舍楼" />
+              </el-form-item>
+              <el-form-item label="备注说明">
+                <el-input v-model="buildingForm.description" type="textarea" :rows="3" placeholder="可选" />
+              </el-form-item>
+            </el-form>
+            <template #footer>
+              <el-button @click="buildingDialogVisible = false">取消</el-button>
+              <el-button type="primary" :loading="actionLoading" @click="saveBuilding">保存</el-button>
+            </template>
+          </el-dialog>
+
+          <el-dialog v-model="roomDialogVisible" :title="editingRoomId ? '编辑房间' : '新增房间'" width="520px">
+            <el-form label-position="top" @submit.prevent>
+              <el-form-item label="所属楼栋">
+                <el-select v-model="roomForm.building" style="width: 100%" placeholder="请选择楼栋">
+                  <el-option v-for="b in buildings" :key="b.id" :label="b.name" :value="b.id" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="房间号">
+                <el-input v-model="roomForm.room_number" placeholder="例如：101、302A" />
+              </el-form-item>
+              <el-form-item label="房间容量">
+                <el-input-number v-model="roomForm.capacity" :min="1" :max="20" style="width: 100%" />
+              </el-form-item>
+              <el-form-item label="是否启用">
+                <el-switch v-model="roomForm.is_active" active-text="启用" inactive-text="停用" />
+              </el-form-item>
+              <el-form-item label="备注说明">
+                <el-input v-model="roomForm.description" type="textarea" :rows="2" placeholder="可选" />
+              </el-form-item>
+            </el-form>
+            <template #footer>
+              <el-button @click="roomDialogVisible = false">取消</el-button>
+              <el-button type="primary" :loading="actionLoading" @click="saveRoom">保存</el-button>
+            </template>
+          </el-dialog>
+
+          <el-dialog v-model="roomDetailDialogVisible" width="760px">
+            <template #header>
+              <span style="font-weight: 700; font-size: 16px">
+                {{ selectedRoom?.building_name }} {{ selectedRoom?.room_number }} — 住户清单
+              </span>
+            </template>
+            <div>
+              <div style="margin-bottom: 8px">
+                <el-tag :type="selectedRoom?.is_full ? 'danger' : 'success'" effect="plain">
+                  当前入住 {{ selectedRoom?.current_occupancy }} / {{ selectedRoom?.capacity }} 人
+                </el-tag>
+                <el-button size="small" type="success" plain style="margin-left: 10px" :disabled="selectedRoom?.is_full || !selectedRoom?.is_active" @click="openBindDialog(selectedRoom)">
+                  新增住户
+                </el-button>
+              </div>
+              <div style="color: var(--text-sub); font-size: 13px; margin-bottom: 6px">当前住户</div>
+              <el-table :data="roomResidents" stripe border size="small" empty-text="暂无住户" style="margin-bottom: 16px">
+                <el-table-column prop="user_name" label="用户名" min-width="120" />
+                <el-table-column prop="student_id" label="学号" min-width="120" />
+                <el-table-column label="入住时间" min-width="165">
+                  <template #default="{ row }">{{ formatDateTime(row.bound_at) }}</template>
+                </el-table-column>
+                <el-table-column label="操作" min-width="180" fixed="right">
+                  <template #default="{ row }">
+                    <el-space>
+                      <el-button size="small" @click="openChangeRoomDialog(row)">换房</el-button>
+                      <el-button size="small" type="danger" plain @click="openUnbindDialog(row)">解绑</el-button>
+                    </el-space>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <div style="color: var(--text-sub); font-size: 13px; margin-bottom: 6px">历史住户</div>
+              <el-table :data="roomHistory" stripe border size="small" empty-text="暂无历史记录">
+                <el-table-column prop="user_name" label="用户名" min-width="120" />
+                <el-table-column prop="student_id" label="学号" min-width="120" />
+                <el-table-column label="入住时间" min-width="165">
+                  <template #default="{ row }">{{ formatDateTime(row.bound_at) }}</template>
+                </el-table-column>
+                <el-table-column label="退房时间" min-width="165">
+                  <template #default="{ row }">{{ formatDateTime(row.unbound_at) }}</template>
+                </el-table-column>
+                <el-table-column prop="operator" label="操作人" min-width="100" />
+              </el-table>
+            </div>
+            <template #footer>
+              <el-button @click="roomDetailDialogVisible = false">关闭</el-button>
+            </template>
+          </el-dialog>
+
+          <el-dialog v-model="bindDialogVisible" title="绑定学生到房间" width="620px">
+            <el-form label-position="top" @submit.prevent>
+              <el-form-item label="搜索学生">
+                <el-row :gutter="12">
+                  <el-col :span="15">
+                    <el-input v-model="studentKeyword" placeholder="按用户名/学号/邮箱搜索" clearable @change="loadAvailableStudents" />
+                  </el-col>
+                  <el-col :span="9">
+                    <el-switch v-model="studentOnlyUnassigned" active-text="仅未分配" inactive-text="全部学生" @change="loadAvailableStudents" />
+                  </el-col>
+                </el-row>
+              </el-form-item>
+              <el-form-item label="选择学生">
+                <el-table
+                  :data="availableStudents"
+                  stripe
+                  border
+                  size="small"
+                  height="240"
+                  highlight-current-row
+                  @current-change="(row) => (bindForm.user_id = row?.id)"
+                  empty-text="暂无可用学生"
+                >
+                  <el-table-column type="radio" width="50" />
+                  <el-table-column prop="username" label="用户名" min-width="120" />
+                  <el-table-column prop="student_id" label="学号" min-width="120" />
+                  <el-table-column prop="email" label="邮箱" min-width="180" />
+                  <el-table-column label="当前房间" min-width="140">
+                    <template #default="{ row }">{{ row.current_room || '—' }}</template>
+                  </el-table-column>
+                </el-table>
+              </el-form-item>
+              <el-form-item label="备注">
+                <el-input v-model="bindForm.remark" type="textarea" :rows="2" placeholder="可选" />
+              </el-form-item>
+            </el-form>
+            <template #footer>
+              <el-button @click="bindDialogVisible = false">取消</el-button>
+              <el-button type="primary" :loading="actionLoading" @click="submitBind">确认绑定</el-button>
+            </template>
+          </el-dialog>
+
+          <el-dialog v-model="unbindDialogVisible" title="解绑学生" width="440px">
+            <el-alert type="warning" :closable="false" style="margin-bottom: 14px">
+              解绑后该房间名额将释放，绑定历史将保留。
+            </el-alert>
+            <el-form label-position="top" @submit.prevent>
+              <el-form-item label="解绑备注">
+                <el-input v-model="unbindForm.remark" type="textarea" :rows="2" placeholder="可选" />
+              </el-form-item>
+            </el-form>
+            <template #footer>
+              <el-button @click="unbindDialogVisible = false">取消</el-button>
+              <el-button type="danger" :loading="actionLoading" @click="submitUnbind">确认解绑</el-button>
+            </template>
+          </el-dialog>
+
+          <el-dialog v-model="changeRoomDialogVisible" title="学生换房" width="520px">
+            <el-alert type="info" :closable="false" style="margin-bottom: 14px">
+              将把 <b>{{ changeRoomTargetUser?.user_name }}</b> 从当前房间换至目标房间。原房间名额释放，绑定历史保留。
+            </el-alert>
+            <el-form label-position="top" @submit.prevent>
+              <el-form-item label="目标房间">
+                <el-select v-model="changeRoomForm.new_room_id" style="width: 100%" placeholder="请选择目标房间" filterable>
+                  <el-option
+                    v-for="r in rooms.filter((x) => x.is_active && !x.is_full && x.id !== changeRoomTargetUser?.room)"
+                    :key="r.id"
+                    :label="`${r.building_name} ${r.room_number}（${r.current_occupancy}/${r.capacity}）`"
+                    :value="r.id"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="备注">
+                <el-input v-model="changeRoomForm.remark" type="textarea" :rows="2" placeholder="可选" />
+              </el-form-item>
+            </el-form>
+            <template #footer>
+              <el-button @click="changeRoomDialogVisible = false">取消</el-button>
+              <el-button type="primary" :loading="actionLoading" @click="submitChangeRoom">确认换房</el-button>
+            </template>
+          </el-dialog>
         </template>
       </el-skeleton>
     </section>

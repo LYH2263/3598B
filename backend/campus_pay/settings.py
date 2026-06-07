@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'accounts',
     'billing',
     'notices',
+    'dormitory',
 ]
 
 MIDDLEWARE = [
@@ -166,6 +167,11 @@ LOGGING = {
             'propagate': False,
         },
         'notices': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'dormitory': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
