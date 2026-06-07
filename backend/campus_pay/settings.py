@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'config_center',
     'reminder',
     'data_center',
+    'search',
 ]
 
 MIDDLEWARE = [

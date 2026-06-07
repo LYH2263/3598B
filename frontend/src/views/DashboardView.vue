@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { ElMessageBox, ElNotification } from 'element-plus'
 
 import SimpleBarChart from '../components/SimpleBarChart.vue'
+import GlobalSearch from '../components/GlobalSearch.vue'
+import CommandPalette from '../components/CommandPalette.vue'
 import { useAuthStore } from '../stores/auth'
 import http from '../utils/http'
 
@@ -13,6 +15,12 @@ const authStore = useAuthStore()
 const loading = ref(true)
 const actionLoading = ref(false)
 const activeTab = ref('overview')
+
+const paletteVisible = ref(false)
+
+function openPalette() {
+  paletteVisible.value = true
+}
 
 const dashboard = reactive({
   wallet: { balance: '0.00', is_frozen: false, frozen_reason: '' },
@@ -602,6 +610,103 @@ async function walletAction(row, action) {
   await Promise.all([loadAdminUsers(), loadWalletLogs()])
 }
 
+async function openFreezeDialog(keyword) {
+  if (!isAdmin.value) return
+  activeTab.value = 'users'
+  if (keyword) {
+    adminUserFilters.keyword = keyword
+    await loadAdminUsers()
+    if (adminUsers.value.length === 1) {
+      walletAction(adminUsers.value[0], 'freeze')
+      return
+    }
+  }
+  ElNotification({ title: '提示', message: keyword ? `请在用户列表中选择用户执行冻结，已搜索：${keyword}` : '请在用户列表中选择用户执行冻结', type: 'info' })
+}
+
+async function openUnfreezeDialog(keyword) {
+  if (!isAdmin.value) return
+  activeTab.value = 'users'
+  if (keyword) {
+    adminUserFilters.keyword = keyword
+    await loadAdminUsers()
+    if (adminUsers.value.length === 1) {
+      walletAction(adminUsers.value[0], 'unfreeze')
+      return
+    }
+  }
+  ElNotification({ title: '提示', message: keyword ? `请在用户列表中选择用户执行解冻，已搜索：${keyword}` : '请在用户列表中选择用户执行解冻', type: 'info' })
+}
+
+function openPublishAnnouncementDialog() {
+  if (!isAdmin.value) return
+  activeTab.value = 'announcements'
+  ElNotification({ title: '提示', message: '请在右侧公告发布表单中填写内容', type: 'info' })
+}
+
+function openSubmitRechargeDialog() {
+  activeTab.value = 'overview'
+  ElNotification({ title: '提示', message: '请在快速提交充值订单区域填写内容', type: 'info' })
+}
+
+async function searchUserByName(keyword) {
+  if (!isAdmin.value || !keyword) return
+  activeTab.value = 'users'
+  adminUserFilters.keyword = keyword
+  await loadAdminUsers()
+  ElNotification({ title: '搜索完成', message: `已按「${keyword}」搜索用户，共 ${adminUsers.value.length} 条结果`, type: 'success' })
+}
+
+async function searchOrderByNo(keyword) {
+  activeTab.value = 'orders'
+  if (keyword) {
+    orderFilters.user_id = ''
+    orderFilters.status = ''
+    await loadOrders()
+    const match = orders.value.find((o) => o.order_no.toLowerCase().includes(keyword.toLowerCase()))
+    if (match) {
+      ElNotification({ title: '找到订单', message: `已定位到订单：${match.order_no}`, type: 'success' })
+      return
+    }
+  }
+  ElNotification({ title: '提示', message: keyword ? `未精确匹配到订单「${keyword}」，请在订单列表中查看` : '请在订单列表中查看', type: 'info' })
+}
+
+function onSearchSelect(item) {
+  ElNotification({ title: '已选择', message: `${item._label || '结果'}：${item.title}`, type: 'success' })
+}
+
+function onViewAll({ category, keyword }) {
+  const map = {
+    users: { tab: 'users', filter: (kw) => (adminUserFilters.keyword = kw) },
+    orders: { tab: 'orders', filter: () => {} },
+    consumptions: { tab: isAdmin.value ? 'consumption-admin' : 'users', filter: () => {} },
+    announcements: { tab: 'announcements', filter: () => {} },
+    tasks: { redirect: '/data-center' },
+    configs: { redirect: '/config-center' },
+  }
+  const target = map[category]
+  if (!target) return
+  if (target.redirect) {
+    router.push(target.redirect)
+    return
+  }
+  activeTab.value = target.tab
+  if (target.filter && keyword) target.filter(keyword)
+  if (target.tab === 'users' && keyword) loadAdminUsers()
+  if (target.tab === 'orders') loadOrders()
+  if (target.tab === 'consumption-admin' || target.tab === 'users') loadConsumptions()
+}
+
+const dialogHandlers = {
+  freeze: openFreezeDialog,
+  unfreeze: openUnfreezeDialog,
+  'publish-announcement': openPublishAnnouncementDialog,
+  'submit-recharge': openSubmitRechargeDialog,
+  searchUser: searchUserByName,
+  searchOrder: searchOrderByNo,
+}
+
 async function loadMyActivities() {
   if (isAdmin.value) return
   try {
@@ -663,23 +768,31 @@ onMounted(async () => {
     <section class="dashboard-wrap">
       <el-card class="section-card" shadow="never">
         <el-row justify="space-between" align="middle" :gutter="12">
-          <el-col :xs="24" :sm="18">
+          <el-col :xs="24" :sm="14">
             <h2 class="section-title">学生水电充值管理系统</h2>
             <p style="margin: 0; color: var(--text-sub)">
               当前身份：{{ isAdmin ? '管理员' : '学生' }} ｜ 未读通知：{{ notifications.unread_count }}
             </p>
           </el-col>
-          <el-col :xs="24" :sm="6" style="text-align: right">
-            <el-button v-if="isAdmin" style="margin-right: 8px" type="primary" @click="router.push('/analytics')">📊 数据看板</el-button>
-            <el-button v-if="isAdmin" style="margin-right: 8px" @click="router.push('/reports')">📋 自定义报表</el-button>
-            <el-button v-if="isAdmin" style="margin-right: 8px" @click="router.push('/config-center')">⚙️ 配置中心</el-button>
-            <el-button v-if="isAdmin" style="margin-right: 8px" @click="router.push('/campus-manage')">🏫 校区管理</el-button>
-            <el-button v-if="isAdmin" style="margin-right: 8px" type="warning" @click="router.push('/collection-manage')">⏰ 催缴管理</el-button>
-            <el-button style="margin-right: 8px" type="primary" plain @click="router.push('/reminders')">🔔 提醒中心</el-button>
-            <el-button style="margin-right: 8px" @click="router.push('/activities')">校园活动</el-button>
-            <el-button v-if="isAdmin" style="margin-right: 8px" type="primary" plain @click="router.push('/activities/manage')">活动管理</el-button>
-            <el-button style="margin-right: 8px" @click="refreshAll">刷新数据</el-button>
-            <el-button type="danger" plain @click="logout">退出登录</el-button>
+          <el-col :xs="24" :sm="10" style="text-align: right">
+            <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap">
+              <GlobalSearch
+                style="width: 360px"
+                @select="onSearchSelect"
+                @view-all="onViewAll"
+                @open-palette="openPalette"
+              />
+              <el-button v-if="isAdmin" type="primary" @click="router.push('/analytics')">📊 数据看板</el-button>
+              <el-button v-if="isAdmin" @click="router.push('/reports')">📋 自定义报表</el-button>
+              <el-button v-if="isAdmin" @click="router.push('/config-center')">⚙️ 配置中心</el-button>
+              <el-button v-if="isAdmin" @click="router.push('/campus-manage')">🏫 校区管理</el-button>
+              <el-button v-if="isAdmin" type="warning" @click="router.push('/collection-manage')">⏰ 催缴管理</el-button>
+              <el-button type="primary" plain @click="router.push('/reminders')">🔔 提醒中心</el-button>
+              <el-button @click="router.push('/activities')">校园活动</el-button>
+              <el-button v-if="isAdmin" type="primary" plain @click="router.push('/activities/manage')">活动管理</el-button>
+              <el-button @click="refreshAll">刷新数据</el-button>
+              <el-button type="danger" plain @click="logout">退出登录</el-button>
+            </div>
           </el-col>
         </el-row>
       </el-card>
@@ -1361,6 +1474,7 @@ onMounted(async () => {
         </template>
       </el-skeleton>
     </section>
+    <CommandPalette v-model:visible="paletteVisible" :dialog-handlers="dialogHandlers" />
   </main>
 </template>
 

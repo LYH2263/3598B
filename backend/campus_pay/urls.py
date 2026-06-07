@@ -15,4 +15,5 @@ urlpatterns = [
     path('api/config/', include('config_center.urls')),
     path('api/reminder/', include('reminder.urls')),
     path('api/data-center/', include('data_center.urls')),
+    path('api/search/', include('search.urls')),
 ]
