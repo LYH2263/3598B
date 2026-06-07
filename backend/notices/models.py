@@ -20,12 +20,14 @@ class UserNotification(models.Model):
     TYPE_ORDER = 'order'
     TYPE_SECURITY = 'security'
     TYPE_SYSTEM = 'system'
+    TYPE_BILLING = 'billing'
 
     TYPE_CHOICES = [
         (TYPE_ANNOUNCEMENT, '系统公告'),
         (TYPE_ORDER, '订单通知'),
         (TYPE_SECURITY, '安全通知'),
         (TYPE_SYSTEM, '系统消息'),
+        (TYPE_BILLING, '账单通知'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')

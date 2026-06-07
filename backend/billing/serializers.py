@@ -7,11 +7,16 @@ from accounts.models import Profile
 from billing.models import (
     BalanceChangeLog,
     ConsumptionRecord,
+    MeterReading,
+    PriceStrategy,
     RechargeOrder,
     RechargeRecord,
+    UtilityBill,
     Wallet,
 )
 from billing.services.ledger_service import LedgerService
+from billing.services.meter_service import MeterService
+from billing.services.utility_bill_service import UtilityBillService
 
 
 class WalletSerializer(serializers.ModelSerializer):
@@ -197,3 +202,193 @@ class ConsumptionCreateSerializer(serializers.Serializer):
 class WalletActionSerializer(serializers.Serializer):
     action = serializers.ChoiceField(choices=[('freeze', '冻结'), ('unfreeze', '解冻')])
     reason = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+
+class PriceStrategySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PriceStrategy
+        fields = (
+            'id',
+            'category',
+            'strategy_type',
+            'unit_price',
+            'tiers',
+            'is_active',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+
+class MeterReadingSerializer(serializers.ModelSerializer):
+    room_name = serializers.CharField(source='room.__str__', read_only=True)
+    user_name = serializers.CharField(source='user.username', read_only=True)
+    building_id = serializers.IntegerField(source='room.building_id', read_only=True)
+
+    class Meta:
+        model = MeterReading
+        fields = (
+            'id',
+            'room',
+            'room_name',
+            'building_id',
+            'user',
+            'user_name',
+            'category',
+            'period_start',
+            'period_end',
+            'previous_reading',
+            'current_reading',
+            'usage',
+            'source',
+            'operator',
+            'remark',
+            'created_at',
+        )
+        read_only_fields = ('id', 'room_name', 'building_id', 'user_name', 'usage', 'operator', 'created_at')
+
+
+class MeterReadingCreateSerializer(serializers.Serializer):
+    room_id = serializers.IntegerField()
+    category = serializers.ChoiceField(choices=MeterReading.CATEGORY_CHOICES)
+    period_start = serializers.DateField()
+    period_end = serializers.DateField()
+    current_reading = serializers.DecimalField(max_digits=12, decimal_places=2)
+    previous_reading = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    source = serializers.ChoiceField(
+        choices=MeterReading.SOURCE_CHOICES,
+        required=False,
+        default=MeterReading.SOURCE_ADMIN,
+    )
+    remark = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+    def create(self, validated_data):
+        request = self.context['request']
+        previous = validated_data.get('previous_reading')
+        return MeterService.create_reading(
+            room_id=validated_data['room_id'],
+            category=validated_data['category'],
+            period_start=validated_data['period_start'],
+            period_end=validated_data['period_end'],
+            current_reading=Decimal(validated_data['current_reading']),
+            previous_reading=Decimal(previous) if previous is not None else None,
+            source=validated_data.get('source', MeterReading.SOURCE_ADMIN),
+            operator=request.user.username,
+            remark=validated_data.get('remark', ''),
+        )
+
+
+class UtilityBillSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.username', read_only=True)
+    room_name = serializers.CharField(source='room.__str__', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    outstanding_amount = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
+    is_overdue = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = UtilityBill
+        fields = (
+            'id',
+            'bill_no',
+            'user',
+            'user_name',
+            'room',
+            'room_name',
+            'category',
+            'category_display',
+            'period_start',
+            'period_end',
+            'previous_reading',
+            'current_reading',
+            'usage',
+            'price_detail',
+            'unit_price',
+            'base_amount',
+            'late_fee_amount',
+            'total_amount',
+            'paid_amount',
+            'outstanding_amount',
+            'due_date',
+            'status',
+            'status_display',
+            'is_overdue',
+            'meter_reading',
+            'consumption_record',
+            'parent_bill',
+            'paid_at',
+            'operator',
+            'remark',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = (
+            'id',
+            'bill_no',
+            'user_name',
+            'room_name',
+            'status_display',
+            'category_display',
+            'outstanding_amount',
+            'is_overdue',
+            'created_at',
+            'updated_at',
+        )
+
+
+class BillPaySerializer(serializers.Serializer):
+    bill_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        help_text='账单 ID 列表，单张缴纳可传单个 bill_id',
+    )
+    bill_id = serializers.IntegerField(required=False)
+
+    def validate(self, attrs):
+        bill_ids = attrs.get('bill_ids') or []
+        if attrs.get('bill_id'):
+            bill_ids = [attrs['bill_id']]
+        if not bill_ids:
+            raise serializers.ValidationError('请选择要缴纳的账单。')
+        attrs['bill_ids'] = bill_ids
+        return attrs
+
+
+class BillVoidSerializer(serializers.Serializer):
+    remark = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+
+class BillMergeSerializer(serializers.Serializer):
+    bill_ids = serializers.ListField(child=serializers.IntegerField())
+
+    def validate_bill_ids(self, value):
+        if len(value) < 2:
+            raise serializers.ValidationError('至少需要选择 2 张账单进行合并。')
+        return value
+
+
+class BillRegenerateSerializer(serializers.Serializer):
+    pass
+
+
+class BillBatchGenerateSerializer(serializers.Serializer):
+    period_start = serializers.DateField()
+    period_end = serializers.DateField()
+    category = serializers.ChoiceField(
+        choices=[('', '全部'), ('water', '水费'), ('electricity', '电费')],
+        required=False,
+        allow_blank=True,
+    )
+
+    def create(self, validated_data):
+        request = self.context['request']
+        category = validated_data.get('category') or None
+        bills = UtilityBillService.generate_bills_for_period(
+            period_start=validated_data['period_start'],
+            period_end=validated_data['period_end'],
+            category=category,
+            operator=request.user.username,
+        )
+        return bills
