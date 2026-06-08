@@ -1,29 +1,32 @@
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElNotification } from 'element-plus'
 
 import AuthLayout from '../layouts/AuthLayout.vue'
 import { loginSchema } from '../validators/auth'
 import { useAuthStore } from '../stores/auth'
-import http from '../utils/http'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const loading = ref(false)
-const captchaLoading = ref(false)
-const captcha = reactive({
-  captcha_id: '',
-  question: '',
-})
 
 const form = reactive({
   account: '',
   password: '',
-  captcha_answer: '',
   remember_me: true,
 })
+
+const demoAccounts = [
+  { label: '管理员', account: 'admin_3598', password: 'Admin@123456' },
+  { label: '学生', account: 'student_3598', password: 'Student@123456' },
+]
+
+function fillDemoAccount(item) {
+  form.account = item.account
+  form.password = item.password
+}
 
 function applyZodError(result) {
   const first = result.error.issues[0]
@@ -32,18 +35,6 @@ function applyZodError(result) {
     message: first?.message || '请检查输入内容。',
     type: 'warning',
   })
-}
-
-async function refreshCaptcha() {
-  captchaLoading.value = true
-  try {
-    const { data } = await http.get('/auth/captcha/')
-    captcha.captcha_id = data.captcha_id
-    captcha.question = data.question
-    form.captcha_answer = ''
-  } finally {
-    captchaLoading.value = false
-  }
 }
 
 async function handleSubmit() {
@@ -55,19 +46,13 @@ async function handleSubmit() {
 
   loading.value = true
   try {
-    await authStore.login({
-      ...form,
-      captcha_id: captcha.captcha_id,
-    })
+    await authStore.login({ ...form })
     ElNotification({ title: '登录成功', message: '欢迎进入充值系统。', type: 'success' })
     await router.push({ name: 'dashboard' })
   } finally {
     loading.value = false
-    await refreshCaptcha()
   }
 }
-
-onMounted(refreshCaptcha)
 </script>
 
 <template>
@@ -79,10 +64,18 @@ onMounted(refreshCaptcha)
       <el-form-item label="密码">
         <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" clearable />
       </el-form-item>
-      <el-form-item label="验证码（简单计算题演示）">
-        <el-space fill style="width: 100%">
-          <el-input v-model="form.captcha_answer" placeholder="请输入计算结果" />
-          <el-button :loading="captchaLoading" @click="refreshCaptcha">{{ captcha.question || '获取验证码' }}</el-button>
+      <el-form-item label="演示账号（点击填充）">
+        <el-space wrap>
+          <el-button
+            v-for="item in demoAccounts"
+            :key="item.account"
+            size="small"
+            type="primary"
+            plain
+            @click="fillDemoAccount(item)"
+          >
+            {{ item.label }}：{{ item.account }}
+          </el-button>
         </el-space>
       </el-form-item>
       <el-form-item>

@@ -99,7 +99,7 @@ async function saveTitle() {
 
 async function setDefault(title) {
   try {
-    await http.post(`/refund-invoice/invoice-titles/${title.id}/set-default/')
+    await http.post(`/refund-invoice/invoice-titles/${title.id}/set-default/`)
     ElNotification({ title: '设置成功', message: '已设为默认抬头。', type: 'success' })
     await loadTitles()
   } catch (_e) {}
@@ -107,7 +107,7 @@ async function setDefault(title) {
 
 async function deleteTitle(title) {
   try {
-    await ElMessageBox.confirm(`确定删除抬头「${title.title_name}」吗？', '删除确认', {
+    await ElMessageBox.confirm(`确定删除抬头「${title.title_name}」吗？`, '删除确认', {
       confirmButtonText: '删除',
       cancelButtonText: '取消',
       type: 'warning',

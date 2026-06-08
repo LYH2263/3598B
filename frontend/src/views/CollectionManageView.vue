@@ -8,8 +8,8 @@ import {
   Warning,
   Money,
   User,
-  Stop,
-  Play,
+  SwitchButton,
+  VideoPlay,
   Plus,
   DataAnalysis,
 } from '@element-plus/icons-vue'
@@ -358,7 +358,7 @@ onMounted(() => {
                 v-if="row.status === 'pending'"
                 type="danger"
                 size="small"
-                :icon="Stop"
+                :icon="SwitchButton"
                 @click="openStopDialog(row)"
               >
                 停止催缴
@@ -403,7 +403,7 @@ onMounted(() => {
                 v-if="row.is_exempted"
                 type="success"
                 size="small"
-                :icon="Play"
+                :icon="VideoPlay"
                 @click="handleResume(row)"
               >
                 恢复催缴

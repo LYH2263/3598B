@@ -111,13 +111,8 @@ class LoginSerializer(serializers.Serializer):
     account = serializers.CharField(max_length=150)
     password = serializers.CharField(write_only=True)
     remember_me = serializers.BooleanField(default=False)
-    captcha_id = serializers.CharField(max_length=64)
-    captcha_answer = serializers.CharField(max_length=16)
 
     def validate(self, attrs):
-        if not CaptchaService.verify_challenge(attrs['captcha_id'], attrs['captcha_answer']):
-            raise serializers.ValidationError({'captcha_answer': '验证码错误或已过期。'})
-
         user = AuthService.find_user_by_account(attrs['account'])
         if not user or not user.check_password(attrs['password']):
             raise serializers.ValidationError({'account': '账号或密码错误。'})

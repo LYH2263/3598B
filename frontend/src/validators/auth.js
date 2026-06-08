@@ -3,7 +3,6 @@ import { z } from 'zod'
 export const loginSchema = z.object({
   account: z.string().min(1, '请输入账号'),
   password: z.string().min(8, '密码长度至少 8 位'),
-  captcha_answer: z.string().min(1, '请输入验证码结果'),
 })
 
 export const registerSchema = z
